@@ -7,6 +7,16 @@ import { MDStrangenessPage, Notify, checkProgress, globalSave, setTheme, special
 import { calculateBuildingsCost, stageResetCheck, setActiveStage, calculateEffects, assignBuildingsProduction, assignResetInformation, calculateVerseCost, calculateTreeCost, calculateStrangenessCost } from './Stage';
 import type { gameSubtab, gameTab } from './Types';
 
+/** EXPERIMENTAL: delaying the aria-current write so it doesn't land in the same instant as the focus/activation event and the SRTab live-region message, to test whether that reduces NVDA's inconsistent "current" double-read. Applied only to the main tab buttons for comparison against the (unchanged) subtab/Stage/theme buttons; roll back by restoring the immediate ariaCurrent assignments if it doesn't help. */
+let tabAriaCurrentTimeout: number | undefined;
+const scheduleTabAriaCurrent = (oldTabId: string, newTabId: string) => {
+    clearTimeout(tabAriaCurrentTimeout);
+    tabAriaCurrentTimeout = setTimeout(() => {
+        getId(oldTabId).ariaCurrent = null;
+        getId(newTabId).ariaCurrent = 'true';
+    }, 150);
+};
+
 /** Tab being null will test current tab/subtab being unlocked and updates subtab list */
 export const switchTab = (tab = null as null | gameTab, subtab = null as null | gameSubtab): void => {
     const oldTab = global.tabs.current;
@@ -29,12 +39,11 @@ export const switchTab = (tab = null as null | gameTab, subtab = null as null | 
         if (oldTab === tab) { return changeSubtab('up'); }
         getId(`${oldTab}Tab`).style.display = 'none';
         getId(`${oldTab}TabBtn`).classList.remove('tabActive');
-        getId(`${oldTab}TabBtn`).ariaCurrent = null;
 
         global.tabs.current = tab;
         getId(`${tab}Tab`).style.display = '';
         getId(`${tab}TabBtn`).classList.add('tabActive');
-        getId(`${tab}TabBtn`).ariaCurrent = 'true';
+        scheduleTabAriaCurrent(`${oldTab}TabBtn`, `${tab}TabBtn`);
 
         let subtabAmount = 0;
         for (const inside of global.tabs[oldTab].list) {
