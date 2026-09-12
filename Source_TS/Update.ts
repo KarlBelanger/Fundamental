@@ -418,7 +418,12 @@ export const numbersUpdate = (ignoreOffline = false) => {
             if (player.time.excess < 0) { getQuery('#gameDisabled > span').textContent = format(-player.time.excess / 1000, { type: 'time' }); }
         } else if (subtab === 'Advanced') {
             getChallengeDescription();
-            getChallengeRewards();
+            //Silent: this is a periodic background refresh (runs every tick while viewing this
+            //subtab), not the user interacting with a reward button - see getChallengeRewards's
+            //announce parameter. Without this, anything that changes the reward set while this
+            //tick is running (e.g. toggling Void<->Supervoid) makes the live region announce
+            //itself, competing with and burying whatever Notify message that action produced
+            getChallengeRewards(false);
         }
     } else if (tab === 'upgrade' || tab === 'Elements') {
         if (subtab === 'Upgrades') {
@@ -1829,7 +1834,19 @@ export const getChallengeDescription = () => {
     assignInnerHTML('#challengeMultiline', text);
 };
 
-/** announce false silences the live region for this update - used when the reward block only changed as a side effect of switching which challenge is previewed, rather than the user actually focusing one of the reward buttons themselves */
+/**
+ * announce false silences the live region for this update - used for every call site EXCEPT a
+ * user actually focusing/clicking one of the reward-related buttons themselves
+ * (voidReward1-5's hover/focus and voidRewardsHead/stabilityRewardsHead's click, both via
+ * scheduleChallengeRewards() in Main.ts, which default to announce=true). That currently means:
+ *   - selectChallenge() in Main.ts, when the reward block changes only as a side effect of
+ *     switching which challenge is being viewed
+ *   - the periodic per-tick refresh in numbersUpdate() (this file), since that's a background
+ *     resync rather than a user action, and would otherwise announce itself whenever anything
+ *     else changes the reward set while the Advanced subtab happens to be open (e.g. toggling
+ *     Void<->Supervoid, which was drowning out that action's own "Entered/Failed to re-enter"
+ *     Notify message)
+ */
 export const getChallengeRewards = (announce = true) => {
     let text = '<p class="greenText center">'; //Need to be closed
     if (global.lastChallenge[0] === 0) {
