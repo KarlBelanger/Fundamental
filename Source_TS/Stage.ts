@@ -5,7 +5,7 @@ import { effectsCache, global, player, prepareVacuum } from './Player';
 import { cloneBeforeReset, loadFromClone, reset, resetStage, resetVacuum } from './Reset';
 import { Confirm, Notify, enterQuantum, enterUltravoid, errorNotify, globalSave, specialHTML } from './Special';
 import type { calculateEffectsType } from './Types';
-import { format, numbersUpdate, scheduleAriaCurrent, stageUpdate, switchTab, visualUpdate } from './Update';
+import { format, getChallengeRewards, numbersUpdate, scheduleAriaCurrent, stageUpdate, switchTab, visualUpdate } from './Update';
 
 /** Normal game tick, everything calculated in milliseconds */
 export const timeUpdate = (tick: number, timeWarp: null | number = null) => {
@@ -3262,6 +3262,16 @@ export const toggleChallengeType = (change = false): boolean => {
             enterExitChallengeUser(0);
             if (player.challenges.active !== 0) { Notify(`Failed to re-enter '${info.name}'`); }
         }
+        //Pre-render the reward block silently, immediately before numbersUpdate() gets to it.
+        //Void and Supervoid have different reward sets, so without this, numbersUpdate()'s own
+        //upcoming refresh (announce=true, the correct default for that call) would render this
+        //same change and announce it, burying the Notify above under a reward-block
+        //announcement. Since this runs synchronously right here, it always wins - by the time
+        //numbersUpdate() reaches getChallengeRewards() a moment later, the content already
+        //matches and assignInnerHTML no-ops, so nothing is left to announce. See
+        //getChallengeRewards's doc comment for why the silencing lives here specifically rather
+        //than on the periodic tick or the reward buttons themselves.
+        if (global.lastChallenge[0] === 0) { getChallengeRewards(false); }
         numbersUpdate();
         visualUpdate();
         //Flipping Void<->Supervoid changes allowedToEnter(0)'s result, so the dedicated Enter/Exit

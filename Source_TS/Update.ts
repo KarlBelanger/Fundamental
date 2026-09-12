@@ -418,12 +418,7 @@ export const numbersUpdate = (ignoreOffline = false) => {
             if (player.time.excess < 0) { getQuery('#gameDisabled > span').textContent = format(-player.time.excess / 1000, { type: 'time' }); }
         } else if (subtab === 'Advanced') {
             getChallengeDescription();
-            //Silent: this is a periodic background refresh (runs every tick while viewing this
-            //subtab), not the user interacting with a reward button - see getChallengeRewards's
-            //announce parameter. Without this, anything that changes the reward set while this
-            //tick is running (e.g. toggling Void<->Supervoid) makes the live region announce
-            //itself, competing with and burying whatever Notify message that action produced
-            getChallengeRewards(false);
+            getChallengeRewards();
         }
     } else if (tab === 'upgrade' || tab === 'Elements') {
         if (subtab === 'Upgrades') {
@@ -1835,17 +1830,25 @@ export const getChallengeDescription = () => {
 };
 
 /**
- * announce false silences the live region for this update - used for every call site EXCEPT a
- * user actually focusing/clicking one of the reward-related buttons themselves
- * (voidReward1-5's hover/focus and voidRewardsHead/stabilityRewardsHead's click, both via
- * scheduleChallengeRewards() in Main.ts, which default to announce=true). That currently means:
- *   - selectChallenge() in Main.ts, when the reward block changes only as a side effect of
- *     switching which challenge is being viewed
- *   - the periodic per-tick refresh in numbersUpdate() (this file), since that's a background
- *     resync rather than a user action, and would otherwise announce itself whenever anything
- *     else changes the reward set while the Advanced subtab happens to be open (e.g. toggling
- *     Void<->Supervoid, which was drowning out that action's own "Entered/Failed to re-enter"
- *     Notify message)
+ * announce false silences the live region for this update, for call sites where the reward
+ * block only changed as an incidental side effect rather than the user directly interacting
+ * with a reward-related control:
+ *   - selectChallenge() in Main.ts, when the reward block changes only because the viewed
+ *     challenge changed
+ *   - toggleChallengeType() in Stage.ts, when switching Void<->Supervoid changes which reward
+ *     set applies
+ * voidReward1-5's hover/focus and voidRewardsHead/stabilityRewardsHead's click (both via
+ * scheduleChallengeRewards() in Main.ts) are direct interaction with this exact control, so
+ * they keep the default announce=true - as does the periodic per-tick refresh in
+ * numbersUpdate() (this file), which deliberately does NOT pass announce=false: silencing it
+ * unconditionally previously caused it to win a timing race against
+ * scheduleChallengeRewards()'s 150ms debounce (that debounce exists for the same reason
+ * scheduleAriaCurrent's does on tabs - see that comment - and removing it is not the fix), since
+ * the tick runs roughly every 80ms and would render the same content change first, leaving
+ * nothing for the debounced announce=true call to detect and no-opping it silently. Toggling
+ * Void<->Supervoid instead pre-renders the change itself via its own direct announce=false call
+ * before numbersUpdate() runs, so there's nothing left for the tick (or a since-elapsed
+ * scheduleChallengeRewards() timer) to re-render either way - see the commit that added this.
  */
 export const getChallengeRewards = (announce = true) => {
     let text = '<p class="greenText center">'; //Need to be closed

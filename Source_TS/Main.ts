@@ -500,19 +500,12 @@ const scheduleChallengeDescription = () => {
         syncChallengeEnterExit();
     }, 150);
 };
-/**
- * Reward-button interactions (voidReward1-5's hover/focus, voidRewardsHead/stabilityRewardsHead's
- * click) call getChallengeRewards() immediately/undebounced, unlike scheduleChallengeDescription.
- * This isn't an oversight - it used to go through a 150ms-debounced scheduleChallengeRewards(),
- * matching the other schedule* helpers, but that actively broke announcements: the periodic
- * per-tick refresh in numbersUpdate() (Update.ts) also calls getChallengeRewards(), just with
- * announce=false, and runs roughly every 80ms - faster than the old 150ms debounce. Whenever a
- * tick landed inside that debounce window, it rendered the exact same content change first
- * (silently, via the attribute-toggle trick), leaving nothing left to announce by the time the
- * debounced call finally ran - assignInnerHTML no-ops because the cache already matches. Calling
- * it immediately here wins that race outright, since it runs synchronously within the same
- * hover/click event, strictly before the next scheduled tick.
- */
+/** Same reasoning as scheduleAriaCurrent/scheduleChallengeDescription: delays the write so it doesn't land in the same instant as the focus/activation event on whichever reward button triggered it. */
+let challengeRewardsTimeout: number | undefined;
+const scheduleChallengeRewards = () => {
+    clearTimeout(challengeRewardsTimeout);
+    challengeRewardsTimeout = setTimeout(getChallengeRewards, 150);
+};
 /** Same idea as scheduleAriaCurrent, for a single button's own aria-pressed instead of an old/new pair. */
 let ariaPressedTimeout: number | undefined;
 const scheduleAriaPressed = (id: string, value: boolean) => {
@@ -1301,18 +1294,18 @@ try { //Start everything
     getId('voidRewardsHead').addEventListener('click', () => {
         global.sessionToggles[0] = !global.sessionToggles[0];
         scheduleAriaPressed('voidRewardsHead', global.sessionToggles[0]);
-        getChallengeRewards();
+        scheduleChallengeRewards();
     });
     getId('stabilityRewardsHead').addEventListener('click', () => {
         global.sessionToggles[2] = !global.sessionToggles[2];
         scheduleAriaPressed('stabilityRewardsHead', global.sessionToggles[2]);
-        getChallengeRewards();
+        scheduleChallengeRewards();
     });
     for (let s = 1; s <= 5; s++) {
         const image = getId(`voidReward${s}`);
         const clickFunc = () => {
             global.lastChallenge[1] = s;
-            getChallengeRewards();
+            scheduleChallengeRewards();
         };
         image.addEventListener('mouseenter', onRealHover(clickFunc));
         if (PC || SR) {
