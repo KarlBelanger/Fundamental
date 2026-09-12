@@ -1488,10 +1488,10 @@ try { //Start everything
         const clickFunc = () => buyUpgrades(i, 4, 'elements');
         const hoverFunc = () => hoverUpgrades(i, 'elements');
         if (PC) {
-            image.addEventListener('mouseenter', () => {
+            image.addEventListener('mouseenter', onRealHover(() => {
                 hoverFunc();
                 if (player.toggles.hover[0]) { clickFunc(); }
-            });
+            }));
             image.addEventListener('mousedown', () => repeatFunction(clickFunc));
         }
         if (MD) {
@@ -1597,7 +1597,7 @@ try { //Start everything
             const image = getQuery(`#milestone${i + 1}Stage${s}Div > input`) as HTMLInputElement;
             image.alt = global.milestonesInfo[s].name[i];
             const hoverFunc = () => hoverStrangeness(i, s, 'milestones');
-            if (PC) { image.addEventListener('mouseenter', hoverFunc); }
+            if (PC) { image.addEventListener('mouseenter', onRealHover(hoverFunc)); }
             if (MD) { image.addEventListener('touchstart', hoverFunc); }
             if (PC || SR) {
                 image.addEventListener('focus', () => {
