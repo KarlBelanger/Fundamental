@@ -1854,6 +1854,7 @@ export const getChallengeDescription = () => {
  */
 let silenceNextChallengeRewards = false;
 export const markChallengeRewardsSilent = () => { silenceNextChallengeRewards = true; };
+let restoreChallengeRewardsLiveTimeout: number | undefined;
 
 /**
  * announce false silences the live region for this update - used by markChallengeRewardsSilent()
@@ -1939,8 +1940,18 @@ export const getChallengeRewards = (announce = true) => {
     }
     assignInnerHTML(rewardsID, text);
     if (!announce) {
-        rewardsID.setAttribute('aria-live', 'polite');
-        rewardsID.setAttribute('aria-atomic', 'true');
+        //Restoring aria-live in the same synchronous tick as the mutation isn't good enough in
+        //practice - the browser's own accessibility-tree update apparently doesn't checkpoint
+        //fast enough to catch the region as genuinely non-live at the moment of the change, so
+        //the removal and the mutation were still both visible together by the time it got
+        //processed. Delaying the restore gives that a real window to catch up before the region
+        //becomes live again. clearTimeout/reassign so overlapping silent calls only ever restore
+        //once, at the last one's delay
+        clearTimeout(restoreChallengeRewardsLiveTimeout);
+        restoreChallengeRewardsLiveTimeout = setTimeout(() => {
+            rewardsID.setAttribute('aria-live', 'polite');
+            rewardsID.setAttribute('aria-atomic', 'true');
+        }, 150);
     }
 };
 
